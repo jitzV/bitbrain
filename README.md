@@ -136,4 +136,4 @@ bit-brain/
 
 ## License
 
-This project currently does not include a formal license file. If you intend to share or distribute it publicly, add an appropriate license before release.
+This project is free and open-source software, released under the [MIT License](https://opensource.org/licenses/MIT). You are free to use, modify, and distribute it for personal purposes.
