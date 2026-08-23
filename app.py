@@ -18,7 +18,7 @@ import ollama  # Import raw Ollama client for Vision calls
 # ==========================================
 # 1. Configuration & Local Setup
 # ==========================================
-OLLAMA_LLM_MODEL = "hf.co/empero-ai/Qwen3.8-9B-GGUF:Q4_K_M"  # Model used for LLM responses
+OLLAMA_LLM_MODEL = "hf.co/empero-ai/Qwen3.8-4B-Distill-GGUF:Q4_K_M"  # Model used for LLM responses
 OLLAMA_VISION_MODEL = "maternion/LightOnOCR-2:1b"  # Model used for Local OCR
 OLLAMA_EMBED_MODEL = "nomic-embed-text"
 

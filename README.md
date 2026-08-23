@@ -60,15 +60,15 @@ Before running the app, ensure the following are installed:
 
 Required Ollama models used by the app:
 
-- `hf.co/empero-ai/Qwen3.8-9B-GGUF:Q4_K_M`
-- `hf.co/unsloth/Qwen3.8-27B-GGUF:UD-IQ1_M`
+- `hf.co/empero-ai/Qwen3.8-4B-Distill-GGUF:Q4_K_M`
+- `maternion/LightOnOCR-2:1b`
 - `nomic-embed-text`
 
 You can pull them with:
 
 ```bash
-ollama pull hf.co/empero-ai/Qwen3.8-9B-GGUF:Q4_K_M
-ollama pull hf.co/unsloth/Qwen3.8-27B-GGUF:UD-IQ1_M
+ollama pull hf.co/empero-ai/Qwen3.8-4B-Distill-GGUF:Q4_K_M
+ollama pull maternion/LightOnOCR-2:1b
 ollama pull nomic-embed-text
 ```
 
