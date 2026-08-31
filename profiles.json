@@ -1,1 +1,44 @@
-{"trust": {"display_name": "Trust", "description": "Trust Document", "collection_id": "trust"}, "home_deed": {"display_name": "Home Deed", "description": "", "collection_id": "home_deed"}, "marriage_certificate": {"display_name": "Marriage Certificate", "description": "", "collection_id": "marriage_certificate"}}
+{
+  "family_passport": {
+    "display_name": "Family Passport",
+    "description": "",
+    "collection_id": "family_passport",
+    "chroma_uuid": "3a66848d-024c-4dd8-80c6-3ba6840e3d73"
+  },
+  "home_deed": {
+    "display_name": "Home Deed",
+    "description": "",
+    "collection_id": "home_deed",
+    "chroma_uuid": "2593cc1e-459a-4b98-b37a-21b1e5da4c8f"
+  },
+  "revocable_trust": {
+    "display_name": "Revocable Trust",
+    "description": "",
+    "collection_id": "revocable_trust",
+    "chroma_uuid": "fd57b2fa-814f-492a-a3ce-1b9778283042"
+  },
+  "will": {
+    "display_name": "Will",
+    "description": "",
+    "collection_id": "will",
+    "chroma_uuid": "b7c39c65-29f7-4a0c-a2f4-e71699a0123e"
+  },
+  "durable_general_power_of_attorney": {
+    "display_name": "Durable General Power of Attorney",
+    "description": "",
+    "collection_id": "durable_general_power_of_attorney",
+    "chroma_uuid": "82b3a81d-3c2c-481d-a5a3-21fbe744d059"
+  },
+  "advanced_medical_directive": {
+    "display_name": "Advanced Medical Directive",
+    "description": "",
+    "collection_id": "advanced_medical_directive",
+    "chroma_uuid": "8963562a-fd4c-4ff7-a72d-9bdd98fbd973"
+  },
+  "health_care_power_of_attorney": {
+    "display_name": "Health Care Power of Attorney",
+    "description": "",
+    "collection_id": "health_care_power_of_attorney",
+    "chroma_uuid": "afa4cc0d-8f39-4d41-9161-25c1316f5f11"
+  }
+}
