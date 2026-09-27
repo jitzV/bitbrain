@@ -60,15 +60,15 @@ Before running the app, ensure the following are installed:
 
 Required Ollama models used by the app:
 
-- `hf.co/empero-ai/Qwen3.8-4B-Distill-GGUF:Q4_K_M`
-- `maternion/LightOnOCR-2:1b`
-- `nomic-embed-text`
+- `hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL` (LLM/Chat Model)
+- `hf.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF:Q8_0` (Vision/OCR Model)
+- `nomic-embed-text` (Embedding Model)
 
 You can pull them with:
 
 ```bash
-ollama pull hf.co/empero-ai/Qwen3.8-4B-Distill-GGUF:Q4_K_M
-ollama pull maternion/LightOnOCR-2:1b
+ollama pull hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL
+ollama pull hf.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF:Q8_0
 ollama pull nomic-embed-text
 ```
 
@@ -108,15 +108,25 @@ bit-brain/
 └── README.md             # Project documentation
 ```
 
-## How It Works
+## RAG Architecture Deep Dive
 
-1. Create a profile from the sidebar.
-2. Choose whether to ingest data as:
-   - conversational notes, or
-   - local files/folders
-3. The system parses documents and stores them in ChromaDB.
-4. Image files and scanned PDFs are processed with the local Ollama Vision OCR model.
-5. The chat tab retrieves the most relevant memory chunks and uses the LLM to answer your questions.
+BitBrain employs a sophisticated, local Retrieval-Augmented Generation (RAG) pipeline to ensure all answers are grounded in the user's private memory profiles. This architecture is entirely local, relying on models and databases running on the user's machine via Ollama.
+
+**1. Ingestion (The Memory Collector):**
+The system accepts two types of inputs:
+*   **Conversational Memory:** Direct facts typed by the user are immediately processed.
+*   **Document Ingestion:** Local files and folders are scanned.
+    *   **Native Parsing:** Documents like `.docx`, `.pdf` (digital), etc., are parsed using `AnyDoc` to extract clean Markdown content.
+    *   **Visual Parsing (OCR):** For images (`.png`, `.jpg`, etc.) and scanned PDFs, the system triggers a local OCR process using `PyPDFium2` and the **Ollama Vision Model** (`hf.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF:Q8_0`). This ensures that visual information from scans is converted into textual data.
+
+**2. Embedding & Storage (The Vector Database):**
+The extracted text (from both conversational and document sources) is then vectorized using the **Embedding Model** (`nomic-embed-text`). These vectors are stored in a local **ChromaDB** instance (`chroma_db/`). Crucially, each memory profile maintains an isolated collection, ensuring that one user's knowledge is entirely separate from another's.
+
+**3. Retrieval (The Search):**
+When a user asks a question in the chat interface, the system performs a semantic search against the profile's ChromaDB collection. The `llama_index` library's `as_chat_engine` function is used to perform a similarity search (`similarity_top_k=3`), retrieving the top 3 most relevant memory chunks (source nodes) that semantically match the query.
+
+**4. Generation (The Answer):**
+The retrieved chunks are injected directly into the prompt context of the **LLM Model** (`hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL`). The LLM is then instructed (via the system prompt) to act as a "helpful personal memory assistant," answering the user's question *only* based on the provided context. This tight coupling of retrieval and generation is what defines the RAG pattern, preventing the LLM from hallucinating and grounding the response in the user's stored knowledge.
 
 ## Notes
 
@@ -125,7 +135,6 @@ bit-brain/
 - Documents are stored locally, so all memory remains on-device unless you change the storage configuration.
 - Image imports are supported through the same file or folder path field in the Knowledge Base tab.
 - Supported image files are converted to PNG bytes for consistent Vision OCR processing.
-- For scanned PDFs, the app renders each page to an image and uses a local vision model for OCR fallback.
 
 ## Example Use Cases
 

@@ -40,5 +40,17 @@
     "description": "",
     "collection_id": "health_care_power_of_attorney",
     "chroma_uuid": "afa4cc0d-8f39-4d41-9161-25c1316f5f11"
+  },
+  "myh360_neethu": {
+    "display_name": "myH360-Neethu",
+    "description": "",
+    "collection_id": "myh360_neethu",
+    "chroma_uuid": "64b7ba48-282c-45a3-94ba-0748f8b4d97c"
+  },
+  "myh360_jithin": {
+    "display_name": "myH360-Jithin",
+    "description": "",
+    "collection_id": "myh360_jithin",
+    "chroma_uuid": "fe0626c6-eb2a-411d-acb9-0bb07cff5d59"
   }
 }
