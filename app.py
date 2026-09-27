@@ -12,9 +12,11 @@ from docx import Document as WordDocument
 from uuid import UUID
 
 from profile_store import cleanup_chroma_collection
+from ollama_models import list_ollama_models, resolve_installed_model
 
 from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.llms import ChatMessage
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 import ollama  # Import raw Ollama client for Vision calls
@@ -218,289 +220,10 @@ def get_index(collection_name):
 
 
 def inject_enterprise_theme():
-    # Dark mode theme (enterprise palette)
-    variables_css = """
-    :root {
-        --bg-start: #020817;
-        --bg-mid: #0b1324;
-        --panel: rgba(15, 23, 42, 0.72);
-        --panel-strong: rgba(15, 23, 42, 0.95);
-        --border: rgba(148, 163, 184, 0.2);
-        --primary: #7dd3fc;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --surface: #111827;
-        --shadow: 0 18px 45px rgba(2, 6, 23, 0.35);
-    }
-
-    html, body, [data-testid="stAppViewContainer"], .stApp {
-        background: linear-gradient(180deg, #020817 0%, #0b1324 100%) !important;
-        color: var(--text) !important;
-    }
-    """
-    
-    fixed_css = """
-        .stApp {
-            font-family: "Segoe UI", sans-serif;
-        }
-
-        .block-container {
-            padding-top: 1.5rem;
-            padding-bottom: 2rem;
-            max-width: 1480px;
-        }
-
-        section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, rgba(9, 14, 24, 1), rgba(15, 23, 42, 0.96)) !important;
-            border-right: 1px solid var(--border);
-        }
-
-        [data-testid="stSidebarNav"] {
-            background: transparent;
-        }
-
-        .stTabs [role="tablist"] {
-            gap: 0.5rem;
-            background: rgba(15, 23, 42, 0.15);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 0.35rem;
-            box-shadow: var(--shadow);
-        }
-
-        .stTabs [role="tab"] {
-            border-radius: 10px;
-            height: 46px;
-            color: var(--text);
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            opacity: 0.8;
-        }
-
-        .stTabs [role="tab"][aria-selected="true"] {
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(168, 85, 247, 0.18));
-            color: var(--text);
-            border: 1px solid rgba(14, 165, 233, 0.35);
-            opacity: 1;
-        }
-
-        .stButton > button {
-            border-radius: 12px;
-            border: 1px solid rgba(125, 211, 252, 0.35);
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            color: #f8fafc !important;
-            font-weight: 600;
-            box-shadow: 0 8px 22px rgba(14, 116, 144, 0.14);
-        }
-
-        .stButton > button:hover {
-            border-color: rgba(14, 165, 233, 0.7);
-            transform: translateY(-1px);
-            box-shadow: 0 12px 30px rgba(14, 165, 233, 0.16);
-        }
-
-        .stDownloadButton > button {
-            border-radius: 12px;
-            background: linear-gradient(135deg, rgba(15, 118, 110, 0.9), rgba(6, 182, 212, 0.85));
-            border: 1px solid rgba(45, 212, 191, 0.4);
-        }
-
-        .stSelectbox > div > div, .stTextInput > div > div, .stTextArea > div > div {
-            background: rgba(15, 23, 42, 0.84) !important;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-        }
-
-        [data-testid="stChatInput"] {
-            background: rgba(30, 41, 59, 0.95) !important;
-            border: 1px solid rgba(125, 211, 252, 0.45) !important;
-            border-radius: 14px !important;
-            box-shadow: 0 8px 22px rgba(2, 6, 23, 0.45);
-        }
-
-        [data-testid="stChatInput"]:focus-within {
-            border-color: rgba(14, 165, 233, 0.85) !important;
-            box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.35), 0 8px 22px rgba(2, 6, 23, 0.45);
-        }
-
-        [data-testid="stChatInput"] textarea {
-            background: transparent !important;
-            color: #f8fafc !important;
-        }
-
-        [data-testid="stChatInput"] textarea::placeholder {
-            color: #94a3b8 !important;
-        }
-
-        .stChatMessage {
-            background: rgba(15, 23, 42, 0.72) !important;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            box-shadow: var(--shadow);
-        }
-
-        .stCode {
-            background: rgba(15, 23, 42, 0.9) !important;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: #dbeafe !important;
-        }
-
-        .metric-card {
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.74)) !important;
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1rem 1.2rem;
-            box-shadow: var(--shadow);
-            min-height: 130px;
-        }
-
-        .metric-label {
-            color: #cbd5e1 !important;
-            opacity: 1;
-            font-size: 0.76rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 0.6rem;
-        }
-
-        .metric-value {
-            color: #f8fafc !important;
-            font-size: 2rem;
-            font-weight: 700;
-            line-height: 1.1;
-        }
-
-        .metric-subtext {
-            margin-top: 0.5rem;
-            color: #94a3b8 !important;
-            opacity: 1;
-            font-size: 0.79rem;
-        }
-
-        .enterprise-header {
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(168, 85, 247, 0.09), rgba(15, 118, 110, 0.08));
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 1.4rem 1.6rem;
-            margin-bottom: 1.2rem;
-            box-shadow: var(--shadow);
-        }
-
-        .eyebrow {
-            color: var(--primary);
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            font-size: 0.72rem;
-            text-transform: uppercase;
-        }
-
-        .enterprise-header h1 {
-            margin: 0.35rem 0 0.3rem 0;
-            font-size: clamp(2rem, 3vw, 2.8rem);
-            line-height: 1.1;
-            color: var(--text);
-        }
-
-        .enterprise-header p {
-            margin: 0;
-            color: var(--text);
-            opacity: 0.8;
-            font-size: 0.96rem;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.35rem 0.7rem;
-            font-size: 0.72rem;
-            border-radius: 999px;
-            border: 1px solid rgba(74, 222, 128, 0.35);
-            background: rgba(34, 197, 94, 0.1);
-            color: #bbf7d0;
-            margin-right: 0.5rem;
-            margin-top: 0.75rem;
-        }
-
-        .section-shell {
-            background: rgba(148, 163, 184, 0.08);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1rem 1.1rem 1.2rem 1.1rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 1rem;
-        }
-
-        .info-panel {
-            background: rgba(148, 163, 184, 0.08);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 0.85rem 1rem;
-            margin: 0.4rem 0 1rem 0;
-        }
-
-        .tiny-label {
-            color: var(--primary);
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-weight: 700;
-            margin-bottom: 0.35rem;
-        }
-
-        .source-list {
-            background: rgba(148, 163, 184, 0.06);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.7rem 0.85rem;
-            color: var(--text);
-            max-height: 220px;
-            overflow: auto;
-        }
-
-        .command-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin: 0.9rem 0 1rem 0;
-        }
-
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.42rem 0.75rem;
-            border-radius: 999px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.03em;
-            border: 1px solid rgba(14, 165, 233, 0.28);
-            background: rgba(14, 165, 233, 0.12);
-            color: var(--text);
-        }
-
-        .sidebar-section {
-            background: rgba(148, 163, 184, 0.06);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.8rem 0.9rem;
-            margin-bottom: 0.8rem;
-        }
-
-        div[data-testid="stExpander"] details {
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background: rgba(148, 163, 184, 0.04);
-        }
-
-        div[data-testid="stExpander"] summary {
-            color: var(--text);
-            font-weight: 600;
-        }
-        """
-    
-    st.markdown(
-        f"<style>{variables_css}{fixed_css}</style>",
-        unsafe_allow_html=True,
-    )
+    stylesheet_path = os.path.join(os.path.dirname(__file__), "enterprise.css")
+    with open(stylesheet_path, "r", encoding="utf-8") as stylesheet:
+        css = stylesheet.read()
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def render_metric_card(label, value, subtext):
@@ -657,37 +380,57 @@ st.sidebar.markdown("<div class='sidebar-section'><div class='eyebrow' style='le
 with st.sidebar.expander("⚙️ Model Settings", expanded=False):
     st.markdown("<div class='tiny-label'>Configure Ollama Models</div>", unsafe_allow_html=True)
     
-    llm_model = st.text_input(
-        "LLM Model",
-        value=st.session_state.ollama_llm_model,
-        help="Name of the Ollama LLM model for chat responses",
-        key="llm_model_input"
-    )
-    if llm_model != st.session_state.ollama_llm_model:
-        st.session_state.ollama_llm_model = llm_model
-        update_ollama_settings()
-        st.rerun()
+    available_ollama_models = list_ollama_models()
+    if available_ollama_models:
+        global_model = st.session_state.ollama_llm_model
+        if global_model not in available_ollama_models:
+            global_model = available_ollama_models[0]
+            st.session_state.ollama_llm_model = global_model
+            update_ollama_settings()
+
+        if "llm_model_select" not in st.session_state or st.session_state.llm_model_select not in available_ollama_models:
+            st.session_state.llm_model_select = global_model
+        llm_model = st.selectbox(
+            "LLM Model",
+            options=available_ollama_models,
+            key="llm_model_select",
+            help="Default chat model; profiles can override this in their chat tab.",
+        )
+        if llm_model != st.session_state.ollama_llm_model:
+            st.session_state.ollama_llm_model = llm_model
+            update_ollama_settings()
+    else:
+        st.warning("No Ollama models found. Make sure Ollama is running and has models installed.")
     
-    vision_model = st.text_input(
-        "Vision Model",
-        value=st.session_state.ollama_vision_model,
-        help="Name of the Ollama Vision model for OCR",
-        key="vision_model_input"
-    )
-    if vision_model != st.session_state.ollama_vision_model:
-        st.session_state.ollama_vision_model = vision_model
-        st.rerun()
+    if available_ollama_models:
+        vision_default = resolve_installed_model(st.session_state.ollama_vision_model, available_ollama_models)
+        vision_key = "vision_model_select"
+        if st.session_state.get(vision_key) not in available_ollama_models:
+            st.session_state[vision_key] = vision_default
+        vision_model = st.selectbox(
+            "Vision Model",
+            options=available_ollama_models,
+            key=vision_key,
+            help="Ollama model used for image and scanned-PDF OCR.",
+        )
+        if vision_model != st.session_state.ollama_vision_model:
+            st.session_state.ollama_vision_model = vision_model
+
+        embed_default = resolve_installed_model(st.session_state.ollama_embed_model, available_ollama_models)
+        embed_key = "embed_model_select"
+        if st.session_state.get(embed_key) not in available_ollama_models:
+            st.session_state[embed_key] = embed_default
+        embed_model = st.selectbox(
+            "Embedding Model",
+            options=available_ollama_models,
+            key=embed_key,
+            help="Ollama model used to embed memories for vector search.",
+        )
+        if embed_model != st.session_state.ollama_embed_model:
+            st.session_state.ollama_embed_model = embed_model
+            update_ollama_settings()
     
-    embed_model = st.text_input(
-        "Embedding Model",
-        value=st.session_state.ollama_embed_model,
-        help="Name of the Ollama embedding model for vector storage",
-        key="embed_model_input"
-    )
-    if embed_model != st.session_state.ollama_embed_model:
-        st.session_state.ollama_embed_model = embed_model
-        update_ollama_settings()
-        st.rerun()
+
 
 st.sidebar.divider()
 
@@ -795,7 +538,7 @@ if not active_profile_id:
     st.markdown(
         """
         <div class="enterprise-header">
-            <div class="eyebrow">Memory Workspace</div>
+            <div class="eyebrow workspace-eyebrow" style="display:block; color:#c8ed55; -webkit-text-fill-color:#c8ed55; font-family:Bahnschrift, Segoe UI, sans-serif; font-size:0.8rem; font-weight:700; line-height:1.5; letter-spacing:0.08em; text-transform:uppercase; visibility:visible; opacity:1;">Memory Workspace</div>
             <h1>Welcome</h1>
             <p>Please create or select a memory profile from the sidebar to begin.</p>
         </div>
@@ -830,7 +573,7 @@ header_disk_html = (
 st.markdown(
     f"""
     <div class="enterprise-header">
-        <div class="eyebrow">Enterprise Memory Workspace</div>
+        <div class="eyebrow workspace-eyebrow" style="display:block; color:#c8ed55; -webkit-text-fill-color:#c8ed55; font-family:Bahnschrift, Segoe UI, sans-serif; font-size:0.8rem; font-weight:700; line-height:1.5; letter-spacing:0.08em; text-transform:uppercase; visibility:visible; opacity:1;">Enterprise Memory Workspace</div>
         <h1>{profile_name}</h1>
         <p>{profile_desc or 'Operational knowledge repository and collaborative memory assistant.'}</p>
         <div style='margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid rgba(148, 163, 184, 0.2);'>
@@ -1015,32 +758,66 @@ with tab2:
 
     index = get_index(active_profile_id)
     render_model_status("embed", st.session_state.ollama_embed_model)
-    render_model_status("llm", st.session_state.ollama_llm_model)
-    chat_engine = index.as_chat_engine(
-        chat_mode="context",
-        similarity_top_k=3,
-        system_prompt="You are BitBrain, a helpful personal memory assistant. Use the provided context from the memory profile to accurately answer questions."
-    )
 
     for msg in st.session_state[chat_key]:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    user_query = st.chat_input("Ask a question based on your memory profile...")
-    if user_query:
-        st.session_state[chat_key].append({"role": "user", "content": user_query})
-        with st.chat_message("user"):
-            st.write(user_query)
+    if available_ollama_models:
+        profile_model = profile.get("llm_model")
+        default_model = (
+            profile_model if profile_model in available_ollama_models
+            else st.session_state.ollama_llm_model if st.session_state.ollama_llm_model in available_ollama_models
+            else available_ollama_models[0]
+        )
+        model_key = f"profile_llm_model_{active_profile_id}"
+        if model_key not in st.session_state:
+            st.session_state[model_key] = default_model
 
-        with st.chat_message("assistant"):
-            with st.spinner("Searching BitBrain Vector DB & Thinking..."):
-                response = chat_engine.chat(user_query)
-                st.write(response.response)
-                
-                if response.source_nodes:
-                    with st.expander("View Retrieved Context"):
-                        for node in response.source_nodes:
-                            st.caption(f"Source: {node.metadata.get('source', 'Unknown')}")
-                            st.text(node.text[:300] + "...")
+        selected_chat_model = st.selectbox(
+            "Chat LLM model",
+            options=available_ollama_models,
+            key=model_key,
+            help="Choose the Ollama model used for this profile's chat responses.",
+        )
+        if profile.get("llm_model") != selected_chat_model:
+            profile["llm_model"] = selected_chat_model
+            save_profiles(st.session_state.profiles)
 
-        st.session_state[chat_key].append({"role": "assistant", "content": response.response})
+        render_model_status("llm", selected_chat_model)
+        chat_llm = Ollama(
+            model=selected_chat_model,
+            request_timeout=120.0,
+            context_window=16384,
+        )
+        chat_engine = index.as_chat_engine(
+            chat_mode="context",
+            llm=chat_llm,
+            chat_history=[
+                ChatMessage(role=message["role"], content=message["content"])
+                for message in st.session_state[chat_key]
+            ],
+            similarity_top_k=3,
+            system_prompt="You are BitBrain, a helpful personal memory assistant. Use the provided context from the memory profile to accurately answer questions."
+        )
+
+        user_query = st.chat_input("Ask a question based on your memory profile...")
+        if user_query:
+            st.session_state[chat_key].append({"role": "user", "content": user_query})
+            with st.chat_message("user"):
+                st.write(user_query)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Searching BitBrain Vector DB & Thinking..."):
+                    response = chat_engine.chat(user_query)
+                    st.write(response.response)
+
+                    if response.source_nodes:
+                        with st.expander("View Retrieved Context"):
+                            for node in response.source_nodes:
+                                st.caption(f"Source: {node.metadata.get('source', 'Unknown')}")
+                                st.text(node.text[:300] + "...")
+
+            st.session_state[chat_key].append({"role": "assistant", "content": response.response})
+    else:
+        st.warning("Chat is unavailable because no Ollama models were found. Start Ollama and install a model to continue.")

@@ -9,7 +9,8 @@
     "display_name": "Home Deed",
     "description": "",
     "collection_id": "home_deed",
-    "chroma_uuid": "2593cc1e-459a-4b98-b37a-21b1e5da4c8f"
+    "chroma_uuid": "2593cc1e-459a-4b98-b37a-21b1e5da4c8f",
+    "llm_model": "hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL"
   },
   "revocable_trust": {
     "display_name": "Revocable Trust",
@@ -21,7 +22,8 @@
     "display_name": "Will",
     "description": "",
     "collection_id": "will",
-    "chroma_uuid": "b7c39c65-29f7-4a0c-a2f4-e71699a0123e"
+    "chroma_uuid": "b7c39c65-29f7-4a0c-a2f4-e71699a0123e",
+    "llm_model": "hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL"
   },
   "durable_general_power_of_attorney": {
     "display_name": "Durable General Power of Attorney",
@@ -45,12 +47,14 @@
     "display_name": "myH360-Neethu",
     "description": "",
     "collection_id": "myh360_neethu",
-    "chroma_uuid": "64b7ba48-282c-45a3-94ba-0748f8b4d97c"
+    "chroma_uuid": "64b7ba48-282c-45a3-94ba-0748f8b4d97c",
+    "llm_model": "hf.co/unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_XL"
   },
   "myh360_jithin": {
     "display_name": "myH360-Jithin",
     "description": "",
     "collection_id": "myh360_jithin",
-    "chroma_uuid": "fe0626c6-eb2a-411d-acb9-0bb07cff5d59"
+    "chroma_uuid": "fe0626c6-eb2a-411d-acb9-0bb07cff5d59",
+    "llm_model": "medgemma:4b"
   }
 }
