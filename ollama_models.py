@@ -1,6 +1,21 @@
 import subprocess
 
 
+def is_ollama_embedding_error(message):
+    """Return True when Ollama is configured without embedding support."""
+    if not message:
+        return False
+
+    normalized = str(message).lower()
+    if "this server does not support embeddings" in normalized:
+        return True
+    if "--embeddings" in normalized and "embeddings" in normalized:
+        return True
+    if "status code: 501" in normalized and "embeddings" in normalized:
+        return True
+    return False
+
+
 def parse_ollama_list(output):
     """Extract model names from the first column of `ollama list` output."""
     models = []

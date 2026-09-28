@@ -1,7 +1,7 @@
 import subprocess
 from unittest.mock import patch
 
-from ollama_models import list_ollama_models, parse_ollama_list
+from ollama_models import list_ollama_models, parse_ollama_list, is_ollama_embedding_error
 
 
 def test_parse_ollama_list_extracts_names_from_first_column():
@@ -40,3 +40,9 @@ def test_list_ollama_models_returns_empty_when_cli_is_unavailable():
         "ollama_models.subprocess.run", side_effect=FileNotFoundError
     ):
         assert list_ollama_models() == []
+
+
+def test_is_ollama_embedding_error_detects_embedding_disabled_server():
+    message = "This server does not support embeddings. Start it with `--embeddings` (status code: 501)"
+    assert is_ollama_embedding_error(message) is True
+    assert is_ollama_embedding_error("something else") is False

@@ -12,11 +12,12 @@ from docx import Document as WordDocument
 from uuid import UUID
 
 from profile_store import cleanup_chroma_collection
-from ollama_models import list_ollama_models, resolve_installed_model
+from ollama_models import list_ollama_models, resolve_installed_model, is_ollama_embedding_error
 
 from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.llms import ChatMessage
+from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 import ollama  # Import raw Ollama client for Vision calls
@@ -42,6 +43,7 @@ Settings.llm = Ollama(
     context_window=4096
 )
 Settings.embed_model = OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
+Settings.node_parser = SentenceSplitter(chunk_size=2048, chunk_overlap=128)
 
 DB_PATH = "./chroma_db"
 PROFILES_FILE = "profiles.json"
@@ -71,9 +73,17 @@ def update_ollama_settings():
             context_window=16384 # <--- Expands chat context window for retrieval
         )
         Settings.embed_model = OllamaEmbedding(model_name=st.session_state.ollama_embed_model)
+        Settings.node_parser = SentenceSplitter(chunk_size=2048, chunk_overlap=128)
         return True
     except Exception as e:
-        st.error(f"Failed to update model settings: {str(e)}")
+        message = str(e)
+        if is_ollama_embedding_error(message):
+            st.error(
+                "Ollama is running without embedding support. Start the Ollama server with `--embeddings` "
+                "and then retry the embedding model selection or reindexing."
+            )
+        else:
+            st.error(f"Failed to update model settings: {message}")
         return False
 
 # Initialize with current models
@@ -232,6 +242,27 @@ def get_loaded_document_sources(collection_name):
         return []
 
 
+def sanitize_document_metadata(metadata):
+    """Trim oversized metadata so LlamaIndex chunking does not fail when reindexing."""
+    if not metadata:
+        return {}
+
+    safe_metadata = {}
+    for key, value in metadata.items():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            safe_metadata[key] = value[:512]
+        elif isinstance(value, (int, float, bool)):
+            safe_metadata[key] = value
+        else:
+            safe_metadata[key] = str(value)[:512]
+
+    if "source" in safe_metadata and isinstance(safe_metadata["source"], str):
+        safe_metadata["source"] = safe_metadata["source"][:512]
+    return safe_metadata
+
+
 def reindex_profile_collection(profile_id):
     """Rebuild a profile's collection using the currently selected embedding model."""
     profile = st.session_state.profiles.get(profile_id)
@@ -251,7 +282,7 @@ def reindex_profile_collection(profile_id):
     for doc_text, metadata in zip(documents, metadatas):
         if doc_text is None:
             continue
-        items.append({"text": doc_text, "metadata": metadata or {}})
+        items.append({"text": doc_text, "metadata": sanitize_document_metadata(metadata or {})})
 
     cleanup_chroma_collection(st.session_state.chroma_client, collection_name, DB_PATH)
     st.session_state.profiles[profile_id]["embed_model"] = st.session_state.ollama_embed_model
@@ -369,6 +400,7 @@ def run_ollama_vision_ocr(file_path):
         return "\n\n".join(extracted_pages)
     finally:
         status_placeholder.empty()
+        pdf.close()
         # Keep the model loaded if you are doing bulk ingestion!
         # stop_ollama_model(st.session_state.ollama_vision_model)
 
@@ -408,19 +440,22 @@ def run_ollama_image_ocr(file_path):
         pass # stop_ollama_model(st.session_state.ollama_vision_model)
 
 def parse_document(file_path):
-    if os.path.splitext(file_path)[1].lower() in IMAGE_EXTS:
+    file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext in IMAGE_EXTS:
         return run_ollama_image_ocr(file_path)
 
     try:
-        # 1. Attempt native AnyDoc parsing first (Fast)
-        return anydoc.to_markdown(file_path)
+        markdown = anydoc.to_markdown(file_path)
     except Exception as e:
-        # 2. Catch scanned PDF error and fallback to local Ollama Vision OCR
-        if "OCR is required" in str(e):
-            st.warning(f"Scanned PDF detected for {os.path.basename(file_path)}. Triggering local Ollama Vision model ({st.session_state.ollama_vision_model})...")
-            return run_ollama_vision_ocr(file_path)
-        else:
-            raise e
+        if file_ext != ".pdf":
+            raise
+        st.warning(f"PDF text extraction failed for {os.path.basename(file_path)}. Trying local Ollama Vision OCR ({st.session_state.ollama_vision_model})...")
+        return run_ollama_vision_ocr(file_path)
+
+    if file_ext == ".pdf" and not (markdown or "").strip():
+        st.warning(f"No text found in {os.path.basename(file_path)}. Trying local Ollama Vision OCR ({st.session_state.ollama_vision_model})...")
+        return run_ollama_vision_ocr(file_path)
+    return markdown
 
 # ==========================================
 # 4. Sidebar UI - Profile Manager
@@ -684,7 +719,7 @@ with tab1:
             with st.spinner("Processing and saving to Vector DB..."):
                 index = get_index(active_profile_id)
                 st.caption(f"🧠 Embedding model in use: {st.session_state.ollama_embed_model}")
-                doc = Document(text=fact_input, metadata={"source": "conversational_memory"})
+                doc = Document(text=fact_input, metadata=sanitize_document_metadata({"source": "conversational_memory"}))
                 index.insert(doc)
                 st.session_state.profiles[active_profile_id]["embed_model"] = st.session_state.ollama_embed_model
                 save_profiles(st.session_state.profiles)
@@ -743,7 +778,7 @@ with tab1:
                             markdown_content = parse_document(file_path)
                             if markdown_content and markdown_content.strip():
                                 st.caption(f"🧠 Embedding model in use: {st.session_state.ollama_embed_model}")
-                                doc = Document(text=markdown_content, metadata={"source": file_path})
+                                doc = Document(text=markdown_content, metadata=sanitize_document_metadata({"source": file_path}))
                                 index.insert(doc)
                                 st.session_state.profiles[active_profile_id]["embed_model"] = st.session_state.ollama_embed_model
                                 save_profiles(st.session_state.profiles)
