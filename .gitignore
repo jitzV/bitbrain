@@ -12,3 +12,7 @@ __pycache__/
 # Editor / OS files
 .DS_Store
 Thumbs.db
+
+# Profile files
+profiles.json
+

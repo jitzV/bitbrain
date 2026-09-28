@@ -103,6 +103,20 @@ def save_profiles(profiles):
         json.dump(profiles, f, default=uuid_serializer, indent=2)
     os.replace(tmp_file, PROFILES_FILE)
 
+
+def get_profile_ingestion_embed_model(profile_id):
+    """Return the embedding model that was used when this profile was last ingested."""
+    profile = st.session_state.profiles.get(profile_id, {})
+    if profile.get("embed_model"):
+        return profile["embed_model"]
+    return st.session_state.ollama_embed_model
+
+
+def requires_profile_reindex(profile_id):
+    """True when the active embedding model differs from the model used to index the profile."""
+    return get_profile_ingestion_embed_model(profile_id) != st.session_state.ollama_embed_model
+
+
 def render_model_status(phase, model_name):
     icons = {
         "llm": "🤖",
@@ -152,6 +166,11 @@ def delete_profile(profile_id):
 
 if "profiles" not in st.session_state:
     st.session_state.profiles = load_profiles()
+
+for profile_id, profile in list(st.session_state.profiles.items()):
+    if "embed_model" not in profile:
+        profile["embed_model"] = st.session_state.ollama_embed_model
+        save_profiles(st.session_state.profiles)
 
 def get_vector_store(collection_name):
     chroma_collection = st.session_state.chroma_client.get_or_create_collection(collection_name)
@@ -211,6 +230,40 @@ def get_loaded_document_sources(collection_name):
         return sorted(set(sources))
     except Exception:
         return []
+
+
+def reindex_profile_collection(profile_id):
+    """Rebuild a profile's collection using the currently selected embedding model."""
+    profile = st.session_state.profiles.get(profile_id)
+    if not profile:
+        return 0
+
+    collection_name = profile.get("collection_id", profile_id)
+    try:
+        collection = st.session_state.chroma_client.get_collection(collection_name)
+        results = collection.get(include=["documents", "metadatas"])
+    except Exception:
+        results = {"documents": [], "metadatas": []}
+
+    items = []
+    documents = results.get("documents", []) or []
+    metadatas = results.get("metadatas", []) or []
+    for doc_text, metadata in zip(documents, metadatas):
+        if doc_text is None:
+            continue
+        items.append({"text": doc_text, "metadata": metadata or {}})
+
+    cleanup_chroma_collection(st.session_state.chroma_client, collection_name, DB_PATH)
+    st.session_state.profiles[profile_id]["embed_model"] = st.session_state.ollama_embed_model
+    save_profiles(st.session_state.profiles)
+    if not items:
+        return 0
+
+    index = get_index(collection_name)
+    for item in items:
+        doc = Document(text=item["text"], metadata=item["metadata"])
+        index.insert(doc)
+    return len(items)
 
 
 def get_index(collection_name):
@@ -446,7 +499,8 @@ with st.sidebar.expander("➕ Create New Profile", expanded=False):
                 "display_name": new_profile_name,
                 "description": new_profile_desc,
                 "collection_id": col_id,
-                "chroma_uuid": chroma_uuid
+                "chroma_uuid": chroma_uuid,
+                "embed_model": st.session_state.ollama_embed_model,
             }
             save_profiles(st.session_state.profiles)
             st.sidebar.success(f"Profile '{new_profile_name}' created!")
@@ -632,6 +686,8 @@ with tab1:
                 st.caption(f"🧠 Embedding model in use: {st.session_state.ollama_embed_model}")
                 doc = Document(text=fact_input, metadata={"source": "conversational_memory"})
                 index.insert(doc)
+                st.session_state.profiles[active_profile_id]["embed_model"] = st.session_state.ollama_embed_model
+                save_profiles(st.session_state.profiles)
             
             with st.chat_message("assistant"):
                 st.success("✅ Memory parsed and saved to Vector DB.")
@@ -689,6 +745,8 @@ with tab1:
                                 st.caption(f"🧠 Embedding model in use: {st.session_state.ollama_embed_model}")
                                 doc = Document(text=markdown_content, metadata={"source": file_path})
                                 index.insert(doc)
+                                st.session_state.profiles[active_profile_id]["embed_model"] = st.session_state.ollama_embed_model
+                                save_profiles(st.session_state.profiles)
                             else:
                                 st.warning(f"No text extracted from {os.path.basename(file_path)}")
                         except Exception as e:
@@ -757,7 +815,19 @@ with tab2:
             )
 
     index = get_index(active_profile_id)
+    ingestion_model = get_profile_ingestion_embed_model(active_profile_id)
     render_model_status("embed", st.session_state.ollama_embed_model)
+    st.caption(f"🧠 Ingestion embedding model: {ingestion_model}")
+    if requires_profile_reindex(active_profile_id):
+        st.warning(
+            "⚠️ The active embedding model is different from the model used to ingest this profile. "
+            "If you changed the embedding model, reindex the profile before relying on old memories."
+        )
+        if st.button("Reindex this profile with the current embedding model", use_container_width=True):
+            with st.spinner("Rebuilding this profile's vector store using the active embedding model..."):
+                count = reindex_profile_collection(active_profile_id)
+            st.success(f"✅ Reindexed {count} memory entries for '{profile_name}'.")
+            st.rerun()
 
     for msg in st.session_state[chat_key]:
         with st.chat_message(msg["role"]):
